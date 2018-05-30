@@ -22,7 +22,21 @@ struct mbheader {
   uint32 entry_addr;
 };
 
-static void readseg(uchar*, uint, uint);
+//static void readseg(uchar*, uint, uint);
+static void memcpy(void *to,void *from,uint n)
+{
+		int d0, d1, d2;
+		asm volatile("rep ; movsl\n\t"
+		     "movl %4,%%ecx\n\t"
+		     "andl $3,%%ecx\n\t"
+		     "jz 1f\n\t"
+		     "rep ; movsb\n\t"
+		     "1:"
+		     : "=&c" (d0), "=&D" (d1), "=&S" (d2)
+		     : "0" (n / 4), "g" (n), "1" ((long)to), "2" ((long)from)
+		     : "memory");
+}
+
 
 void
 bootmain(void)
@@ -31,11 +45,20 @@ bootmain(void)
   void (*entry)(void);
   uint32 *x;
   uint n;
-
+	int i;
+	char* base = (char *)0xb8000;
   x = (uint32*) 0x10000; // scratch space
 
-  // multiboot header must be in the first 8192 bytes
-  readseg((uchar*)x, 8192, 0);
+	  
+// multiboot header must be in the first 8192 bytes
+//  readseg((uchar*)x, 8192, 0);
+
+
+	for(i = 0; i < 10;i+=2)
+	{
+	
+		*(base + i)  = 'a';
+ 	}
 
   for (n = 0; n < 8192/4; n++)
     if (x[n] == 0x1BADB002)
@@ -46,6 +69,7 @@ bootmain(void)
   return;
 
 found_it:
+
   hdr = (struct mbheader *) (x + n);
 
   if (!(hdr->flags & 0x10000))
@@ -55,21 +79,32 @@ found_it:
   if (hdr->load_end_addr < hdr->load_addr)
     return; // no idea how much to load
 
-  readseg((uchar*) hdr->load_addr,
-    (hdr->load_end_addr - hdr->load_addr),
-    (n * 4) - (hdr->header_addr - hdr->load_addr));
+  //readseg((uchar*) hdr->load_addr,
+   // (hdr->load_end_addr - hdr->load_addr),
+   // (n * 4) - (hdr->header_addr - hdr->load_addr));
 
-  // If too much RAM was allocated, then zero redundant RAM
+	memcpy(hdr->load_addr,0x10000+(n * 4) - (hdr->header_addr - hdr->load_addr),(hdr->load_end_addr - hdr->load_addr));
+  // If too much RAM was allocated, then zero redundant RAM;
   if (hdr->bss_end_addr > hdr->load_end_addr)
     stosb((void*) hdr->load_end_addr, 0,
       hdr->bss_end_addr - hdr->load_end_addr);
 
   // Call the entry point from the multiboot header.
   // Does not return!
-  entry = (void(*)(void))(hdr->entry_addr);
+
+#if 0	
+	for(; i < 140;i+=2)
+	{
+		*(base + i)  = 'b';
+	}	*(base+i)= (unsigned int)hdr->load_addr;
+	i+=2;
+	*(base+i) = 22;
+#endif
+	//while(1); 
+ entry = (void(*)(void))(hdr->entry_addr);
   entry();
 }
-
+#if 0
 static void
 waitdisk(void)
 {
@@ -117,3 +152,5 @@ readseg(uchar* pa, uint count, uint offset)
   for(; pa < epa; pa += SECTSIZE, offset++)
     readsect(pa, offset);
 }
+
+#endif

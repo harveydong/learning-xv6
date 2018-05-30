@@ -2,6 +2,18 @@
 #include "memlayout.h"
 #include "mmu.h"
 
+#define ST2_SECTORS 16
+#define ST2_STARTSECTOR 1
+#define ST2_ADDRESS 0x8000
+#define ST2_SEGMENT 0x0000
+
+#define ST3_SECTORS 100
+#define ST3_STARTSECTOR 1
+#define ST3_ADDRESS 0x0000
+//#define ST3_SEGMENT 0x6000
+#define ST3_SEGMENT 0x1000
+
+
 # Start the first CPU: switch to 32-bit protected mode, jump into C.
 # The BIOS loads this code from the first sector of the hard disk into
 # memory at physical address 0x7c00 and starts executing in real mode
@@ -17,7 +29,8 @@ start:
   movw    %ax,%ds             # -> Data Segment
   movw    %ax,%es             # -> Extra Segment
   movw    %ax,%ss             # -> Stack Segment
-
+ movw $0x7c00,%ax
+ movw %ax,%sp
   # Physical address line A20 is tied to zero so that the first PCs 
   # with 2 MB would run software that assumed 1 MB.  Undo that.
 seta20.1:
@@ -35,6 +48,25 @@ seta20.2:
 
   movb    $0xdf,%al               # 0xdf -> port 0x60
   outb    %al,$0x60
+
+	movb %dl,DriveNumber 
+
+#load kernel form disk by bios int 0x13h.
+
+# Read the 2nd stage boot loader into memory.
+	#mov ah, 0x42			; Extended Read
+	#mov dl, [DriveNumber]		; http://www.ctyme.com/intr/rb-0708.htm
+	#mov si, ST2_DAP;
+	#int 0x13
+	#jc read_fail
+
+	
+	movb $0x42,%ah 
+	movb DriveNumber,%dl 
+	movw $ST3_DAP,%si 
+	int   $0x13
+	jc read_fail
+
 
   # Switch from real to protected mode.  Use a bootstrap GDT that makes
   # virtual addresses map directly to physical addresses so that the
@@ -68,6 +100,36 @@ start32:
 spin:
   jmp     spin
 
+
+
+DriveNumber: .byte 0x00
+msg_ReadFail: .asciz "Failed to read drive." 
+
+print_string_16:		#	; Output string in SI to screen
+	pusha
+	movb $0x0e,%ah 		#	; int 0x10 teletype function
+.repeat:
+	lodsb			#	; Get char from string
+	cmpb $0,%al   #, 0
+	je .done			#; If char is zero, end of string
+	int $0x10		#	; Otherwise, print it
+	jmp   .repeat
+.done:
+	popa
+	ret
+	
+	
+read_fail:
+	movw msg_ReadFail,%si
+	call print_string_16
+	jmp halt
+ 
+halt:
+	hlt
+	jmp halt
+	
+	
+	
 # Bootstrap GDT
 .p2align 2                                # force 4 byte alignment
 gdt:
@@ -79,3 +141,20 @@ gdtdesc:
   .word   (gdtdesc - gdt - 1)             # sizeof(gdt) - 1
   .long   gdt                             # address gdt
 
+
+ST2_DAP:
+	.byte 0x10
+	.byte 0x00
+	.word ST2_SECTORS
+	.word ST2_ADDRESS
+	.word ST2_SEGMENT
+	.quad ST2_STARTSECTOR
+
+
+ST3_DAP:
+	.byte 0x10
+	.byte 0x00
+	.word ST3_SECTORS
+	.word ST3_ADDRESS
+	.word ST3_SEGMENT
+	.quad ST3_STARTSECTOR

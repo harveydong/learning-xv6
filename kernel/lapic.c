@@ -52,23 +52,12 @@ lapicw(int index, int value)
 }
 //PAGEBREAK!
 
-void check_cpuid()
-{
-		uint32 edx = 0,ecx = 0;
-		__asm__ volatile("cpuid":"=d"(edx),"=c"(ecx):"a"(0x1):"memory","cc");
-		cprintf("check cpuid 0x1\n");
-		cprintf("local apic check,ecx:0x%x,edx:0x%x\n",ecx,edx);
-		cprintf("support APIC:%s\n",(edx&(1<<9))?"YES":"NO");
-		cprintf("support x2APIC:%s\n",(ecx&(1<<21))?"YES":"NO");
-		
-}
-
 void
 lapicinit(void)
 {
   if(!lapic) 
     return;
-	check_cpuid();
+
   // Enable local APIC; set spurious interrupt vector.
   lapicw(SVR, ENABLE | (T_IRQ0 + IRQ_SPURIOUS));
 

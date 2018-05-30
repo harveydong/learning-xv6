@@ -39,24 +39,12 @@ static struct mp*
 mpsearch1(uint a, int len)
 {
   uchar *e, *p, *addr;
-  struct mp *tmp;
 
   addr = p2v(a);
   e = addr+len;
   for(p = addr; p < e; p += sizeof(struct mp))
-    if(memcmp(p, "_MP_", 4) == 0 && sum(p, sizeof(struct mp)) == 0){
-		tmp = (struct mp*)p;
-		cprintf("mp floating pointer:\n");
-		cprintf("mp sig:%x%x%x%x\n",tmp->signature[0],tmp->signature[1],tmp->signature[2],tmp->signature[3]);
-		cprintf("mp phy addr:0x%x\n",tmp->physaddr);
-		cprintf("mp length:0x%x\n",tmp->length);
-		cprintf("mp spec rev:0x%x\n",tmp->specrev);
-		cprintf("mp type:0x%x\n",tmp->type);
-		cprintf("mp imcrp:0x%x\n",tmp->imcrp);
-		
-		
+    if(memcmp(p, "_MP_", 4) == 0 && sum(p, sizeof(struct mp)) == 0)
       return (struct mp*)p;
-    }
   return 0;
 }
 
@@ -74,21 +62,13 @@ mpsearch(void)
 
   bda = (uchar *) P2V(0x400);
   if((p = ((bda[0x0F]<<8)| bda[0x0E]) << 4)){
-	  cprintf("ebda addr here\n");
-    if((mp = mpsearch1(p, 1024))){
-		cprintf("look for floating pointer from ebda:%p",mp);
+    if((mp = mpsearch1(p, 1024)))
       return mp;
-    }
   } else {
-	
     p = ((bda[0x14]<<8)|bda[0x13])*1024;
-    cprintf("mpserch from system base memory:%p\n",p);
-    if((mp = mpsearch1(p-1024, 1024))){
-		cprintf("look for floating pointer from system base memory:%p",mp);
+    if((mp = mpsearch1(p-1024, 1024)))
       return mp;
-    }
   }
-  cprintf("mpserch from 0xf0000--0x10000\n");
   return mpsearch1(0xF0000, 0x10000);
 }
 
@@ -124,9 +104,7 @@ mpinit(void)
   struct mpconf *conf;
   struct mpproc *proc;
   struct mpioapic *ioapic;
-  struct mpbus *mpbus;
-  struct mpiointr  *iointr;
-  
+
   bcpu = &cpus[0];
   if((conf = mpconfig(&mp)) == 0)
     return;
@@ -136,7 +114,7 @@ mpinit(void)
     switch(*p){
     case MPPROC:
       proc = (struct mpproc*)p;
-      cprintf("mpinit ncpu=%d apicid=%d,local apic version:0x%x,cpu flags:0x%x,feature:0x%x\n", ncpu, proc->apicid,proc->version,proc->flags,proc->feature);
+      cprintf("mpinit ncpu=%d apicid=%d\n", ncpu, proc->apicid);
       if(proc->flags & MPBOOT)
         bcpu = &cpus[ncpu];
       cpus[ncpu].id = ncpu;
@@ -148,24 +126,10 @@ mpinit(void)
       ioapic = (struct mpioapic*)p;
       ioapicid = ioapic->apicno;
       p += sizeof(struct mpioapic);
-      cprintf("mp config io apic:\n");
-      cprintf("ioapic: id:0x%x, version:0x%x,flags:0x%x,mmio:0x%p\n",ioapic->apicno,ioapic->version,ioapic->flags,ioapic->addr);
       continue;
     case MPBUS:
-		mpbus = (struct mpbus *)p;
-		cprintf("mp config bus:\n");
-		cprintf("bus id:0x%x\n",mpbus->busid);
-		cprintf("bus type:%s\n",mpbus->bustype);
-		
-		p += sizeof(struct mpbus);
-		continue;
     case MPIOINTR:
-		iointr = (struct mpiointr *)p;
-		p+=8;
-		cprintf("mp io intr:\n");
-		cprintf("intr_type:0x%x,io_intr_flag:0x%x,s_id:0x%x,s_irq:0x%x,d_ioapic_id:0x%x,d_ioapic_intin:0x%x\n",iointr->intr_type,iointr->io_intr_flag,iointr->s_bus_id,iointr->s_bus_irq,iointr->d_io_apic_id,iointr->d_io_apic_intin);
     case MPLINTR:
-     
       p += 8;
       continue;
     default:
